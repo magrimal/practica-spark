@@ -5,6 +5,8 @@ from gensim.utils import tokenize
 
 from pyspark.sql import SparkSession
 import csv
+from pyspark.sql.functions import col
+
 
 def main(filename):
     spark = SparkSession.builder.getOrCreate()
@@ -141,7 +143,7 @@ def simpsons():#todo: no coger la primera fila. Creo que por parámetro se deber
     tareauno = tareauno.reduceByKey(lambda a, b: a + b)
     #print(tareauno.take(10))
 
-    df = spark.createDataFrame(
+    df_tarea1 = spark.createDataFrame(
         tareauno.map(
             lambda x: (x[0][0], x[0][1], x[1])
         ),
@@ -167,16 +169,29 @@ def simpsons():#todo: no coger la primera fila. Creo que por parámetro se deber
 
     tareados = tareados.reduceByKey(lambda a, b: a+b)
 
-    print('-')
-    print(tareados.take(10))
+    # print('-')
+    # print(tareados.take(10))
 
     df_tarea2 = spark.createDataFrame(
     tareados.map(lambda x: (x[0][0], x[0][1], x[1])),
     ["episode_id", "imdb_rating", "total_palabras_dialogo"]
     )
 
-    print('-')
-    print(df_tarea2.take(10))
+    # print('-')
+    # print(df_tarea2.take(10))
+
+    #TAREA 3
+
+    df_tarea1 = df_tarea1.withColumn("imdb_raiting", col("imdb_raiting").cast("float"))
+    df_tarea2 = df_tarea2.withColumn("imdb_rating", col("imdb_rating").cast("float"))
+
+    # Pearson 1: IMDb vs número de personajes femeninos
+    pearsonTareaUno = df_tarea1.corr("imdb_raiting", "numero_personajes_femeninos")
+    print("Correlación IMDb vs personajes femeninos:", pearsonTareaUno)
+
+    # Pearson 2: IMDb vs número total de palabras
+    pearsonTareaDos = df_tarea2.corr("imdb_rating", "total_palabras_dialogo")
+    print("Correlación IMDb vs total de palabras:", pearsonTareaDos)
 
     return rdd_lines_episodes_joined_characters_joined
 
