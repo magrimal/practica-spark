@@ -122,9 +122,10 @@ def simpsons():#todo: no coger la primera fila. Creo que por parámetro se deber
     #print(col_rdd_lines.take(10))
     #print("-")
     #print(col_rdd_episodes.take(10))
-    #print("-")
-    #print(rdd_lines_episodes_joined.take(10))
+    # print("-")
+    # print(rdd_lines_episodes_joined.take(10))
 
+    #JOIN EPISODIOS CON CARACTERES
     rdd_lines_episodes_joined_characters_joined = rdd_lines_episodes_joined.join(col_rdd_characters)#(character_id, ((episode_id, speaking_line, normalized_text, imdb_raiting), (gender)))
     
     #print("-")
@@ -147,7 +148,35 @@ def simpsons():#todo: no coger la primera fila. Creo que por parámetro se deber
         ["episode_id", "imdb_raiting", "numero_personajes_femeninos"]
     )
 
-    print(df.take(10))
+    #print(df.take(10))
+
+    #TAREA 2
+
+    tareados = rdd_lines_episodes_joined.map(lambda row: (row[1][0], row[1][1], row[1][2], row[1][3]))#(episode_id, speaking_line, normalized_text, imdb_raiting)
+    
+    # print('-')
+    # print(tareados.take(10))
+    
+    tareados = tareados.filter(lambda row: row[1].lower() == 'true') #son diálogos
+    # print('-')
+    # print(tareados.take(10))
+
+    tareados = tareados.flatMap(
+    lambda x: [((x[0], x[3]), 1) for palabra in x[2].split()]
+    ) #episode_id, imdb_raiting, 1
+
+    tareados = tareados.reduceByKey(lambda a, b: a+b)
+
+    print('-')
+    print(tareados.take(10))
+
+    df_tarea2 = spark.createDataFrame(
+    tareados.map(lambda x: (x[0][0], x[0][1], x[1])),
+    ["episode_id", "imdb_rating", "total_palabras_dialogo"]
+    )
+
+    print('-')
+    print(df_tarea2.take(10))
 
     return rdd_lines_episodes_joined_characters_joined
 
