@@ -36,7 +36,7 @@ def scispace(filename):
     counts_by_file = counts_by_file.map(lambda x: (x[0][1], (x[0][0], x[1])))
     pprint.pprint(counts_by_file.collect())
 
-def felicidad(filename):
+def felicidad(filename): #TODO: NO SE DEBERÍA COGER LA PRIMERA FILA. Creo que por parámetro se deberían pasar los ficheros.
     spark = SparkSession.builder.getOrCreate()
     sc = spark.sparkContext
 
@@ -84,5 +84,73 @@ def felicidad(filename):
 
     return ordenado
 
+def simpsons():#todo: no coger la primera fila. Creo que por parámetro se deberían pasar los ficheros.
+    spark = SparkSession.builder.getOrCreate()
+    sc = spark.sparkContext
+
+    rddLines = sc.textFile("C:\\Users\\natal\\Documents\\ADatos\\practica3\\simpsons_script_lines.csv")
+    rddLocations = sc.textFile("C:\\Users\\natal\\Documents\\ADatos\\practica3\\simpsons_locations.csv")
+    rddEpisodes = sc.textFile("C:\\Users\\natal\\Documents\\ADatos\\practica3\\simpsons_episodes.csv")
+    rddCharacters = sc.textFile("C:\\Users\\natal\\Documents\\ADatos\\practica3\\simpsons_characters.csv")
+
+    def parse_csv(line):
+        try:
+            return next(csv.reader([line]))
+        except:
+            return []
+        
+    parsedLines = rddLines.map(parse_csv)
+    parsedLocations = rddLocations.map(parse_csv)
+    parsedEpisodes = rddEpisodes.map(parse_csv)
+    parsedCharacters = rddCharacters.map(parse_csv)
+
+    parsedLines = parsedLines.filter(lambda row: len(row) > 12)# and row[5].lower() == 'true') #la columna 6 indica si es diálogo
+    parsedLocations = parsedLocations.filter(lambda row: len(row) > 2)
+    parsedEpisodes = parsedEpisodes.filter(lambda row: len(row) > 13)
+    parsedCharacters = parsedCharacters.filter(lambda row: len(row) > 3 and row[3] != '')
+
+    col_rdd_lines = parsedLines.map(lambda row: (row[1], (row[5], row[6], row[11])))#episode_id, speaking_line, character_id, normalized_text
+    col_rdd_episodes = parsedEpisodes.map(lambda row: (row[0], row[2]))#id, imdb_raiting
+    col_rdd_characters = parsedCharacters.map(lambda row: (row[0], row[3]))#id, gender
+    #print("-")
+    #print(col_rdd_characters.take(10))
+
+    #JOIN DE LÍNEAS CON EPISODIOS
+    rdd_lines_episodes_joined = col_rdd_lines.join(col_rdd_episodes)#(episode_id, ((speaking_line, character_id, normalized_text), (imdb_raiting))
+    rdd_lines_episodes_joined = rdd_lines_episodes_joined.map(lambda row: (row[1][0][1], (row[0], row[1][0][0], row[1][0][2], row[1][1])))#(character_id, (episode_id, speaking_line, normalized_text, imdb_raiting))
+    #print("-")
+    #print(col_rdd_lines.take(10))
+    #print("-")
+    #print(col_rdd_episodes.take(10))
+    #print("-")
+    #print(rdd_lines_episodes_joined.take(10))
+
+    rdd_lines_episodes_joined_characters_joined = rdd_lines_episodes_joined.join(col_rdd_characters)#(character_id, ((episode_id, speaking_line, normalized_text, imdb_raiting), (gender)))
+    
+    #print("-")
+    #print(rdd_lines_episodes_joined_characters_joined.take(10))
+
+    #TAREA 1
+
+    tareauno = rdd_lines_episodes_joined_characters_joined.map(lambda row: (row[1][0][0], row[1][0][3], row[0], row[1][1]))#(episode_id, imdb_raiting, character_id, gender)
+    tareauno = tareauno.filter(lambda row: row[3] == 'f') #personajes femeninos
+    tareauno = tareauno.map(lambda x: ((x[0], x[1], x[2])))#(episode_id, imdb_raiting, character_id)
+    tareauno = tareauno.distinct()
+    tareauno = tareauno.map(lambda row: ((row[0], row[1]), 1))#((episode_id, imdb_raiting), 1)
+    tareauno = tareauno.reduceByKey(lambda a, b: a + b)
+    #print(tareauno.take(10))
+
+    df = spark.createDataFrame(
+        tareauno.map(
+            lambda x: (x[0][0], x[0][1], x[1])
+        ),
+        ["episode_id", "imdb_raiting", "numero_personajes_femeninos"]
+    )
+
+    print(df.take(10))
+
+    return rdd_lines_episodes_joined_characters_joined
+
 #scispace("C:\\Users\\natal\\Documents\\ADatos\\practica3\\space.json")
-felicidad("C:\\Users\\natal\\Documents\\ADatos\\practica3\\simpsons_script_lines.csv")
+#felicidad("C:\\Users\\natal\\Documents\\ADatos\\practica3\\simpsons_script_lines.csv")
+simpsons()
